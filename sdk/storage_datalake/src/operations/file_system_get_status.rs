@@ -1,0 +1,84 @@
+use crate::clients::FileSystemClient;
+use crate::{util::*, Properties};
+use azure_core::prelude::*;
+use azure_core::{
+    headers::{etag_from_headers, last_modified_from_headers},
+    AppendToUrlQuery, Etag, Response as HttpResponse,
+};
+use azure_storage::core::headers::CommonStorageResponseHeaders;
+use chrono::{DateTime, Utc};
+use std::convert::TryInto;
+
+type GetFileSystemStatus =
+    futures::future::BoxFuture<'static, crate::Results<GetFileSystemPropertiesResponse>>;
+
+#[derive(Debug, Clone)]
+pub struct GetFileSystemStatusBuilder {
+    client: FileSystemClient,
+    client_request_id: Option<ClientRequestId>,
+    timeout: Option<Timeout>,
+}
+
+impl GetFileSystemStatusBuilder {
+    pub(crate) fn new(client: FileSystemClient) -> Self {
+        Self {
+            client,
+            client_request_id: None,
+            timeout: None,
+        }
+    }
+
+    setters! {
+        client_request_id: ClientRequestId => Some(client_request_id),
+        timeout: Timeout => Some(timeout),
+    }
+
+    pub fn into_future(self) -> GetFileSystemStatus {
+        let this = self.clone();
+        let ctx = self.client.context.clone();
+
+        Box::pin(async move {
+            let mut url = this.client.url()?;
+            self.timeout.append_to_url_query(&mut url);
+            url.query_pairs_mut().append_pair("resource", "filesystem");
+
+            let mut request = this
+                .client
+                .prepare_request(url.as_str(), http::Method::HEAD);
+
+            request.insert_headers(&this.client_request_id);
+            request.insert_headers(&ContentLength::new(0));
+
+            let response = self
+                .client
+                .pipeline()
+                .send(&mut ctx.clone(), &mut request)
+                .await?;
+
+            GetFileSystemStatusResponse::try_from(response).await
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GetFileSystemStatusResponse {
+    pub common_storage_response_headers: CommonStorageResponseHeaders,
+    pub etag: Etag,
+    pub last_modified: DateTime<Utc>,
+    pub namespace_enabled: bool,
+    pub properties: Properties,
+}
+
+impl GetFileSystemStatusResponse {
+    pub async fn try_from(response: HttpResponse) -> crate::Result<Self> {
+        let (_status_code, headers, _pinned_stream) = response.deconstruct();
+
+        Ok(GetFileSystemStatusResponse {
+            common_storage_response_headers: (&headers).try_into()?,
+            etag: Etag::from(etag_from_headers(&headers)?),
+            last_modified: last_modified_from_headers(&headers)?,
+            namespace_enabled: namespace_enabled_from_headers(&headers)?,
+            properties: (&headers).try_into()?,
+        })
+    }
+}

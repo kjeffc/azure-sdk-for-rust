@@ -59,6 +59,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         get_fs_props_response
     );
 
+    println!("getting file system status...");
+    let get_fs_status_response = file_system_client.get_status().into_future().await?;
+    println!(
+        "get file system status response == {:?}\n",
+        get_fs_status_props_response
+    )
+
     println!("deleting file system...");
     let delete_fs_response = file_system_client.delete().into_future().await?;
     println!("delete file system response == {:?}\n", delete_fs_response);

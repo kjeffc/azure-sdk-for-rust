@@ -122,4 +122,8 @@ impl DirectoryClient {
     pub fn set_properties(&self, _properties: Properties) -> SetFileSystemPropertiesBuilder {
         todo!()
     }
+
+    pub fn get_file_status(&self) -> HeadPathBuilder<Self> {
+        HeadPathBuilder::new(self.clone(), self.file_system_client.context.clone())
+    }
 }

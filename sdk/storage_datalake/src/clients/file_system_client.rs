@@ -88,6 +88,10 @@ impl FileSystemClient {
         SetFileSystemPropertiesBuilder::new(self.clone(), Some(properties))
     }
 
+    pub fn get_status(&self) -> SetFileSystemPropertiesBuilder {
+        GetFileSystemStatusBuilder::new(self.clone())
+    }
+
     pub(crate) fn prepare_request(
         &self,
         uri: &str,
